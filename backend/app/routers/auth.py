@@ -1,13 +1,16 @@
+import secrets
+import time
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, get_owner
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models import User
-from app.schemas import LoginIn, RegisterIn, TokenOut, UserOut, UserUpdate
+from app.schemas import LoginIn, RegisterIn, TokenOut, UnlockIn, UserOut, UserUpdate
 from app.services.categories import create_default_categories
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -15,6 +18,19 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 def _registration_open(db: Session) -> bool:
     return not get_settings().single_user or db.scalar(select(func.count()).select_from(User)) == 0
+
+
+@router.post("/unlock", response_model=TokenOut)
+def unlock(data: UnlockIn, db: Session = Depends(get_db)):
+    """Personal mode with APP_PASSWORD: trade the one password for a token."""
+    settings = get_settings()
+    if not settings.single_user or not settings.app_password:
+        raise HTTPException(status_code=404, detail="Not Found")
+    if not secrets.compare_digest(data.password.encode(), settings.app_password.encode()):
+        time.sleep(1)  # slow down guessing
+        raise HTTPException(status_code=401, detail="Wrong password")
+    user = get_owner(db)
+    return TokenOut(access_token=create_access_token(user.id), user=UserOut.model_validate(user))
 
 
 @router.get("/registration")

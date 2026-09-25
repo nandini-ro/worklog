@@ -1,19 +1,16 @@
 "use client";
 
-import { BarChart3 } from "lucide-react";
-import Link from "next/link";
+import { BarChart3, Lock } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useAuth, useToast } from "./providers";
+import { useAuth } from "./providers";
 import { Field, Spinner } from "./ui";
 
-export function AuthForm({ mode }: { mode: "login" | "register" }) {
-  const { user, loading, login, register } = useAuth();
+/** Personal mode: the app is locked behind one password (APP_PASSWORD on the server). */
+export function UnlockForm() {
+  const { user, loading, unlock } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
-  const toast = useToast();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,9 +25,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     setBusy(true);
     setError(null);
     try {
-      if (mode === "login") await login(email, password);
-      else await register(name, email, password);
-      toast(mode === "login" ? "Welcome back!" : "Account created");
+      await unlock(password);
       router.replace("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -46,54 +41,29 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/30">
             <BarChart3 className="h-5 w-5" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">{mode === "login" ? "Sign in to WorkLog" : "Create your account"}</h1>
-          <p className="mt-1 text-sm text-slate-500">Record what you worked on. Report it in seconds.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">WorkLog</h1>
+          <p className="mt-1 text-sm text-slate-500">Enter your password to continue.</p>
         </div>
         <form onSubmit={submit} className="card space-y-4 p-6">
-          {expired && mode === "login" && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">Your session expired. Please sign in again.</p>}
+          {expired && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">Your session expired. Please unlock again.</p>}
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400" role="alert">{error}</p>}
-          {mode === "register" && (
-            <Field label="Full name" htmlFor="name">
-              <input id="name" className="input" required autoFocus value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
-            </Field>
-          )}
-          <Field label="Email" htmlFor="email">
-            <input id="email" type="email" className="input" required autoFocus={mode === "login"} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-          </Field>
-          <Field label="Password" htmlFor="password" hint={mode === "register" ? "At least 8 characters" : undefined}>
+          <Field label="Password" htmlFor="password">
             <input
               id="password"
               type="password"
               className="input"
               required
-              minLength={mode === "register" ? 8 : undefined}
+              autoFocus
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              autoComplete="current-password"
             />
           </Field>
           <button type="submit" className="btn-primary w-full" disabled={busy}>
-            {busy && <Spinner className="h-4 w-4 text-white" />}
-            {mode === "login" ? "Sign in" : "Create account"}
+            {busy ? <Spinner className="h-4 w-4 text-white" /> : <Lock className="h-4 w-4" />}
+            Unlock
           </button>
         </form>
-        <p className="mt-6 text-center text-sm text-slate-500">
-          {mode === "login" ? (
-            <>
-              New here?{" "}
-              <Link href="/register" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-                Create an account
-              </Link>
-            </>
-          ) : (
-            <>
-              Already have an account?{" "}
-              <Link href="/login" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-                Sign in
-              </Link>
-            </>
-          )}
-        </p>
       </div>
     </div>
   );

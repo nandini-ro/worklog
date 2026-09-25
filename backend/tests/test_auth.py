@@ -57,3 +57,23 @@ def test_single_user_mode_needs_no_sign_in(client, monkeypatch):
     assert client.get("/api/categories").status_code == 200
     assert client.get("/api/auth/me").json()["id"] == me.json()["id"]
     assert client.get("/api/auth/registration").json() == {"open": False}
+
+
+def test_app_password_locks_the_app(client, monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "single_user", True)
+    monkeypatch.setattr(get_settings(), "app_password", "correct horse")
+    assert client.get("/api/auth/me").status_code == 401
+    assert client.post("/api/auth/unlock", json={"password": "wrong"}).status_code == 401
+    r = client.post("/api/auth/unlock", json={"password": "correct horse"})
+    assert r.status_code == 200
+    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert client.get("/api/auth/me", headers=headers).status_code == 200
+
+
+def test_hosted_postgres_url_is_normalized():
+    from app.core.config import Settings
+
+    assert Settings(database_url="postgres://u:p@h/db").database_url == "postgresql+psycopg://u:p@h/db"
+    assert Settings(database_url="postgresql://u:p@h/db").database_url == "postgresql+psycopg://u:p@h/db"

@@ -2,7 +2,7 @@
 
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { api, tokenStore } from "@/lib/api";
+import { api, ApiError, tokenStore } from "@/lib/api";
 import type { User } from "@/lib/types";
 import { Modal } from "./ui";
 
@@ -128,9 +128,11 @@ export const useConfirm = () => useContext(ConfirmCtx);
 interface AuthState {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => void;
+  /** True when the server is locked behind APP_PASSWORD and we have no valid token. */
+  locked: boolean;
+  unlock: (password: string) => Promise<void>;
+  /** Forget the token on this device (only meaningful when a password is set). */
+  lock: () => void;
   setUser: (u: User) => void;
 }
 const AuthCtx = createContext<AuthState | null>(null);
@@ -138,13 +140,21 @@ const AuthCtx = createContext<AuthState | null>(null);
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [locked, setLocked] = useState(false);
 
-  // Personal mode: the backend needs no sign-in, so just ask who "me" is.
+  // Personal mode: with no APP_PASSWORD the server answers /me directly; otherwise it
+  // needs the token from /unlock.
   useEffect(() => {
     api
       .get<User>("/api/auth/me")
       .then(setUser)
-      .catch(() => setUser(null))
+      .catch((err) => {
+        setUser(null);
+        if (err instanceof ApiError && err.status === 401) {
+          tokenStore.clear();
+          setLocked(true);
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -152,26 +162,22 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       user,
       loading,
-      async login(email, password) {
-        const r = await api.post<{ access_token: string; user: User }>("/api/auth/login", { email, password });
+      locked,
+      async unlock(password) {
+        const r = await api.post<{ access_token: string; user: User }>("/api/auth/unlock", { password });
         tokenStore.set(r.access_token);
+        setLocked(false);
         setUser(r.user);
       },
-      async register(name, email, password) {
-        const r = await api.post<{ access_token: string; user: User }>("/api/auth/register", { name, email, password });
-        tokenStore.set(r.access_token);
-        setUser(r.user);
-      },
-      logout() {
+      lock() {
         tokenStore.clear();
-        setUser(null);
-        // Full reload intentionally drops all in-memory state on sign-out.
+        // Full reload intentionally drops all in-memory state.
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.href = "/login";
       },
       setUser,
     }),
-    [user, loading],
+    [user, loading, locked],
   );
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }

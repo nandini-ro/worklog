@@ -27,6 +27,10 @@ class LoginIn(BaseModel):
     password: str
 
 
+class UnlockIn(BaseModel):
+    password: str
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int

@@ -1,9 +1,10 @@
 "use client";
 
-import { BarChart3, CalendarDays, ClipboardList, FileText, FolderKanban, History, LayoutDashboard, Menu, Moon, Plus, Settings, Sun, X } from "lucide-react";
+import { BarChart3, CalendarDays, ClipboardList, FileText, FolderKanban, History, LayoutDashboard, Lock, Menu, Moon, Plus, Settings, Sun, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { tokenStore } from "@/lib/api";
 import { useAuth, useTheme } from "./providers";
 import { cn, PageLoader } from "./ui";
 
@@ -18,11 +19,15 @@ const NAV = [
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, locked, lock } = useAuth();
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!loading && locked) router.replace("/login");
+  }, [loading, locked, router]);
 
   // Global shortcut: press "n" (outside inputs) to add today's work.
   useEffect(() => {
@@ -37,7 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [router]);
 
-  if (loading) return <PageLoader />;
+  if (loading || locked) return <PageLoader />;
   if (!user)
     return (
       <div className="flex min-h-screen items-center justify-center px-4 text-center text-sm text-slate-500">
@@ -101,6 +106,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button className="icon-btn" onClick={() => setTheme(isDark ? "light" : "dark")} aria-label="Toggle theme" title={`Theme: ${theme}`}>
             {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
+          {tokenStore.get() && (
+            <button className="icon-btn" onClick={lock} aria-label="Lock" title="Lock">
+              <Lock className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>

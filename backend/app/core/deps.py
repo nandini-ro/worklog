@@ -31,7 +31,8 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     """The authenticated user is the only source of user identity — never trust a client-sent user_id."""
-    if get_settings().single_user:
+    settings = get_settings()
+    if settings.single_user and not settings.app_password:
         return get_owner(db)
     unauthorized = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

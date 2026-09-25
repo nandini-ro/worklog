@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,8 +13,10 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
-    # Personal mode: no sign-in; every request acts as the single owner account.
+    # Personal mode: every request acts as the single owner account.
     single_user: bool = True
+    # When set (e.g. when deployed), the app is locked behind this one password.
+    app_password: str | None = None
 
     # AI (all optional — the app works without any key)
     ai_provider: str = "auto"  # auto | openai | groq | gemini | local
@@ -24,6 +27,15 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.0-flash"
     ai_timeout_seconds: float = 30.0
+
+    @field_validator("database_url")
+    @classmethod
+    def _use_psycopg3(cls, v: str) -> str:
+        # Hosted Postgres (Neon, Render, ...) hands out postgres:// or postgresql:// URLs.
+        for prefix in ("postgres://", "postgresql://"):
+            if v.startswith(prefix):
+                return "postgresql+psycopg://" + v[len(prefix):]
+        return v
 
     @property
     def cors_origin_list(self) -> list[str]:

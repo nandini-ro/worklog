@@ -37,7 +37,6 @@ function Profile() {
   const { user, setUser } = useAuth();
   const toast = useToast();
   const [name, setName] = useState(user?.name ?? "");
-  const [pw, setPw] = useState({ current: "", next: "" });
   const [busy, setBusy] = useState<string | null>(null);
 
   const save = async (e: React.FormEvent) => {
@@ -52,19 +51,6 @@ function Profile() {
       setBusy(null);
     }
   };
-  const changePw = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy("pw");
-    try {
-      await api.put<User>("/api/auth/me", { current_password: pw.current, new_password: pw.next });
-      setPw({ current: "", next: "" });
-      toast("Password changed");
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Could not change password", "error");
-    } finally {
-      setBusy(null);
-    }
-  };
 
   return (
     <Card title="Profile" description="Your name appears on exported reports.">
@@ -74,28 +60,8 @@ function Profile() {
             <input id="s-name" className="input" required value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
         </div>
-        <div className="flex-1">
-          <Field label="Email" htmlFor="s-email">
-            <input id="s-email" className="input" value={user?.email ?? ""} disabled />
-          </Field>
-        </div>
         <button className="btn-primary" disabled={busy === "name" || !name.trim() || name === user?.name}>
           {busy === "name" && <Spinner className="h-4 w-4 text-white" />} Save
-        </button>
-      </form>
-      <form onSubmit={changePw} className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-end dark:border-slate-800">
-        <div className="flex-1">
-          <Field label="Current password" htmlFor="s-cur">
-            <input id="s-cur" type="password" className="input" required value={pw.current} onChange={(e) => setPw((p) => ({ ...p, current: e.target.value }))} autoComplete="current-password" />
-          </Field>
-        </div>
-        <div className="flex-1">
-          <Field label="New password" htmlFor="s-new">
-            <input id="s-new" type="password" className="input" required minLength={8} value={pw.next} onChange={(e) => setPw((p) => ({ ...p, next: e.target.value }))} autoComplete="new-password" />
-          </Field>
-        </div>
-        <button className="btn-secondary" disabled={busy === "pw"}>
-          {busy === "pw" && <Spinner className="h-4 w-4" />} Change password
         </button>
       </form>
     </Card>
